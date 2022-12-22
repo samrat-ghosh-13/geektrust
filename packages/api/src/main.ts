@@ -5,6 +5,8 @@ import morganBody from 'morgan-body';
 import compression from 'compression';
 import correlator from 'express-correlation-id';
 import cors from 'cors';
+import healthcheck from './app/controllers/healthcheck';
+import liveness from "./app/controllers/liveness";
 
 const app = express();
 
@@ -16,12 +18,12 @@ app
   .use(cors())
   .use(express.json())
   .use(express.urlencoded({ extended: false }))
-  .use(express.static(path.join(__dirname, '../public')));
+  .use(express.static(path.join(__dirname, '../admin')))
+  .use('/health/readiness', healthcheck)
+  .use('/health/liveness', liveness);
 
 // app.use(correlationIdHandler);
 // app.use(errorHandler);
-// app.use("/health/readiness", healthcheck);
-// app.use("/health/liveness", liveness);
 
 app.get('/api', (req, res) => {
   res.send({ message: 'Welcome to api!' });
@@ -30,7 +32,7 @@ app.get('/api', (req, res) => {
 app.get('/api/members', async (req, res) => {
   const { data } = await axios({
     method: 'get',
-    url: 'https://geektrust.s3-ap-southeast-1.amazonaws.com/adminui-problem/members.json',
+    url: process.env.API_MEMBERS_URL,
   });
 
   const searchValue =
@@ -49,16 +51,16 @@ app.get('/api/members', async (req, res) => {
   res.status(200).send({
     message: 'Geektrust Members API',
     data: searchableData,
-    count: searchableData.length,
+    totalRecords: searchableData.length,
   });
 });
 
 // serving fe client
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  res.sendFile(path.join(__dirname, '../admin/index.html'));
 });
 
-const port = process.env.port || 3333;
+const port = process.env.API_PORT;
 const server = app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}/api`);
 });
