@@ -1,12 +1,18 @@
 import express from 'express';
 import path from 'path';
-import axios from 'axios';
 import morganBody from 'morgan-body';
 import compression from 'compression';
 import correlator from 'express-correlation-id';
 import cors from 'cors';
+
+// controllers
 import healthcheck from './app/controllers/healthcheck';
-import liveness from "./app/controllers/liveness";
+import liveness from './app/controllers/liveness';
+import api from './app/controllers/api';
+import members from './app/controllers/member';
+
+// middleware
+import { correlationIdHandler, errorHandler } from './app/middleware';
 
 const app = express();
 
@@ -15,45 +21,16 @@ morganBody(app);
 app
   .use(compression())
   .use(correlator())
+  .use(correlationIdHandler)
   .use(cors())
   .use(express.json())
   .use(express.urlencoded({ extended: false }))
+  .use(errorHandler)
   .use(express.static(path.join(__dirname, '../admin')))
   .use('/health/readiness', healthcheck)
-  .use('/health/liveness', liveness);
-
-// app.use(correlationIdHandler);
-// app.use(errorHandler);
-
-app.get('/api', (req, res) => {
-  res.send({ message: 'Welcome to api!' });
-});
-
-app.get('/api/members', async (req, res) => {
-  const { data } = await axios({
-    method: 'get',
-    url: process.env.API_MEMBERS_URL,
-  });
-
-  const searchValue =
-    req?.query?.search?.toString().toLowerCase().split(' ') || [];
-
-  const searchableData = data.filter((obj: any) => {
-    let found = false;
-    searchValue.forEach((item) => {
-      if (Object.values(obj).join(' ').toLowerCase().includes(item)) {
-        found = true;
-      }
-    });
-    return found;
-  });
-
-  res.status(200).send({
-    message: 'Geektrust Members API',
-    data: searchableData,
-    totalRecords: searchableData.length,
-  });
-});
+  .use('/health/liveness', liveness)
+  .use('/api', api)
+  .use('/api/members', members);
 
 // serving fe client
 app.get('*', (req, res) => {
